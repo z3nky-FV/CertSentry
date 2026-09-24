@@ -1,0 +1,39 @@
+# Python
+**/.venv/
+**/venv/
+**/__pycache__/
+*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+
+# Local configuration and secrets
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+
+# Local data, logs, and generated reports
+**/data/
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+*.log
+
+# Node.js / Next.js
+**/node_modules/
+**/.next/
+frontend/out/
+frontend/coverage/
+frontend/tsconfig.tsbuildinfo
+npm-debug.log*
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
