@@ -40,6 +40,19 @@ npm ci
 npm run dev
 ```
 
+Если Windows запрещает занять порт `8000`, запустите backend на другом свободном порту, например `8010`:
+
+```powershell
+# В окне backend
+python -m uvicorn app.main:app --reload --port 8010
+
+# В новом окне frontend, до npm run dev
+$env:CERTSENTRY_API_URL = "http://localhost:8010"
+npm run dev
+```
+
+`CERTSENTRY_API_URL` настраивает прокси Next.js. Если frontend уже запущен, остановите его и запустите заново после изменения переменной.
+
 Откройте <http://localhost:3000>. Backend API и его Swagger-документация доступны на <http://localhost:8000/docs>, а проверка готовности — <http://localhost:8000/health>.
 
 Команды статической проверки кода перед демонстрацией:
@@ -265,6 +278,7 @@ README.md           Полный гайд проекта
 | Telegram не прислал сообщение | Переменные заданы в терминале backend до старта, токен/чат верны, backend имеет доступ к Telegram API; повторное оповещение подавляется |
 | Изменения схемы/данных не видны | Перезапустите backend; инвентарь хранится в указанном SQLite-файле |
 | Порт 3000 или 8000 занят | Остановите другой процесс или освободите порт; frontend rewrite по умолчанию направлен на `localhost:8000` |
+| Backend сообщает `WinError 10013` на порту 8000 | Проверьте порт командами `netstat -ano | findstr :8000` и `netsh interface ipv4 show excludedportrange protocol=tcp`. Если порт занят или зарезервирован, запустите backend на свободном порту, например 8010, и задайте `CERTSENTRY_API_URL=http://localhost:8010` перед запуском frontend. |
 
 Ошибка сертификата не означает, что сканирование молча пропускает сервис: ошибки отдельных подключений возвращаются API и показываются в Dashboard.
 
