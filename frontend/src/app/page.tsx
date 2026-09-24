@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { ShieldCheck, Radar, Download, Loader2, ChevronLeft, ChevronRight, Info, ArrowUpDown } from 'lucide-react';
+import { ShieldCheck, Radar, Download, Loader2, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 
 const API = '/api/v1';
 const PAGE_SIZE = 25;
@@ -23,6 +23,12 @@ type ScanError = { hostname: string; port: number; error: string | null };
 
 const changeValue = (value: unknown) => Array.isArray(value) ? value.join(', ') :
   typeof value === 'boolean' ? (value ? 'Да' : 'Нет') : value == null ? '—' : String(value);
+const issuerLabel = (issuer: string | null) => {
+  if (!issuer) return '—';
+  const organization = issuer.match(/(?:^|,\s*)O=([^,]+)/)?.[1];
+  const commonName = issuer.match(/(?:^|,\s*)CN=([^,]+)/)?.[1];
+  return (organization || commonName || issuer).trim();
+};
 
 const fetcher = async (url: string, init?: RequestInit) => {
   const res = await fetch(url, init);
@@ -49,8 +55,8 @@ export default function DashboardPage() {
   const [statusF, setStatusF] = useState('');
   const [changesOnly, setChangesOnly] = useState(false);
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState('risk_score');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const [sort, setSort] = useState('days_left');
+  const [sortOrder, setSortOrder] = useState('asc');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -127,7 +133,7 @@ export default function DashboardPage() {
 
   const setSortField = (field: string) => {
     if (sort === field) setSortOrder(order => order === 'asc' ? 'desc' : 'asc');
-    else { setSort(field); setSortOrder(field === 'risk_score' || field === 'days_left' ? 'desc' : 'asc'); }
+    else { setSort(field); setSortOrder(field === 'risk_score' ? 'desc' : 'asc'); }
     setPage(1);
   };
   const statusColor = (s: string) => s === 'OK' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' :
@@ -144,8 +150,8 @@ export default function DashboardPage() {
     ['Средний остаток', `${metrics.avg_days_left} дн.`], ['Изменения на проверку', metrics.pending_changes],
   ] : [];
   const columns = [
-    ['hostname', 'Сервис'], ['owner', 'Владелец'], ['issuer', 'Issuer'],
-    ['valid_to', 'Окончание'], ['days_left', 'Дней'], ['status', 'Статус'], ['risk_score', 'Риск'], ['change_pending', 'Изменение'],
+    ['hostname', 'Service'], ['issuer', 'Certificate'],
+    ['valid_to', 'Expiration'], ['days_left', 'Days Left'],
   ];
 
   return (
@@ -200,6 +206,10 @@ export default function DashboardPage() {
       </section>}
 
       <section className="bg-slate-800/40 rounded-xl border border-slate-700/50 overflow-hidden">
+        <div className="p-3 md:p-4 border-b border-slate-700/50">
+          <h2 className="font-semibold">Сертификаты</h2>
+          <p className="text-xs text-slate-400 mt-1">В столбце Certificate указан центр, выдавший сертификат (Issuer / CA); полное имя и детали доступны при раскрытии строки.</p>
+        </div>
         <div className="p-3 md:p-4 flex flex-col lg:flex-row gap-3 justify-between lg:items-center border-b border-slate-700/50">
           <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
             <input aria-label="Поиск сертификатов" type="search" placeholder="Сервис, владелец, Issuer, статус, дата…" value={search}
@@ -218,31 +228,39 @@ export default function DashboardPage() {
             <thead className="bg-slate-900/40 text-slate-400 text-xs">
               <tr>{columns.map(([field, label]) => <th key={field} scope="col" className="p-3 font-medium">
                 <button className="inline-flex items-center gap-1 hover:text-white" onClick={() => setSortField(field)}>{label}<ArrowUpDown className={`w-3 h-3 ${sort === field ? 'text-blue-400' : ''}`} />{sort === field && <span>{sortOrder === 'asc' ? '↑' : '↓'}</span>}</button>
-              </th>)}<th scope="col" className="p-3" aria-label="Подробнее" /></tr>
+              </th>)}</tr>
             </thead>
             <tbody className="divide-y divide-slate-700/30">
-              {certs.length === 0 ? <tr><td colSpan={9} className="p-8 text-center text-slate-400">{loading ? 'Загрузка…' : 'Сертификаты не найдены. Запустите сканирование или измените фильтр.'}</td></tr> : certs.map(c => {
+              {certs.length === 0 ? <tr><td colSpan={4} className="p-8 text-center text-slate-400">{loading ? 'Загрузка…' : 'Сертификаты не найдены. Запустите сканирование или измените фильтр.'}</td></tr> : certs.map(c => {
                 const rowKey = `${c.hostname}:${c.port}`;
                 return <React.Fragment key={rowKey}>
                 <tr className="hover:bg-slate-700/20 cursor-pointer transition-colors" onClick={() => setExpanded(expanded === rowKey ? null : rowKey)} aria-expanded={expanded === rowKey}>
-                  <td className="p-3 font-mono">{c.hostname}:{c.port}</td><td className="p-3 text-slate-300">{c.owner || '—'}</td>
-                  <td className="p-3 max-w-[160px] truncate" title={c.issuer || ''}>{c.issuer || '—'}</td><td className="p-3">{formatDate(c.valid_to)}</td>
-                  <td className="p-3">{c.days_left} дн.</td><td className="p-3"><span className={`px-2 py-0.5 rounded text-xs border ${statusColor(c.status)}`}>{c.status}</span></td>
-                  <td className="p-3 font-bold">{c.risk_score}</td>
-                  <td className="p-3">{c.change_pending ? <span className="px-2 py-0.5 rounded border border-orange-400/40 bg-orange-500/10 text-orange-200 text-xs">Проверить</span> : c.change_count > 0 ? <span className="text-emerald-400 text-xs">Проверено</span> : <span className="text-slate-500 text-xs">Базовая версия</span>}</td>
-                  <td className="p-3 text-slate-400"><Info className="w-4 h-4" /></td>
+                  <td className="p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono">{c.hostname}:{c.port}</span>
+                      <span aria-label={`Статус: ${c.status}`} className={`px-2 py-0.5 rounded text-xs border ${statusColor(c.status)}`}>{c.status}</span>
+                    </div>
+                  </td>
+                  <td className="p-3 max-w-[220px] truncate text-slate-300" title={c.issuer || ''}>{issuerLabel(c.issuer)}</td>
+                  <td className="p-3">{formatDate(c.valid_to)}</td>
+                  <td className="p-3">{c.days_left}</td>
                 </tr>
-                {expanded === rowKey && <tr className="bg-slate-900/40 text-xs"><td colSpan={9} className="p-4 whitespace-normal">
+                {expanded === rowKey && <tr className="bg-slate-900/40 text-xs"><td colSpan={4} className="p-4 whitespace-normal">
                   <div className="grid md:grid-cols-2 gap-2 text-slate-300">
                     <div><span className="text-slate-400">CN:</span> {c.common_name || '—'}</div>
                     <div className="break-all"><span className="text-slate-400">SAN:</span> {c.sans?.length ? c.sans.join(', ') : '—'}</div>
+                    <div><span className="text-slate-400">Владелец:</span> {c.owner || '—'}</div>
                     <div><span className="text-slate-400">Критичность:</span> {c.criticality}</div>
+                    <div><span className="text-slate-400">Статус:</span> <span className={`px-2 py-0.5 rounded text-xs border ${statusColor(c.status)}`}>{c.status}</span></div>
+                    <div><span className="text-slate-400">Risk Score:</span> {c.risk_score}/100</div>
                     <div><span className="text-slate-400">Цепочка доверия:</span> {c.is_chain_valid ? 'валидна' : 'ошибка проверки'}</div>
                     <div><span className="text-slate-400">DNS соответствует:</span> {c.is_hostname_match ? 'да' : 'нет'}</div>
                     <div><span className="text-slate-400">Self-signed:</span> {c.is_self_signed ? 'да' : 'нет'}</div>
                     <div><span className="text-slate-400">Слабая криптография:</span> {c.is_weak_crypto ? 'да' : 'нет'}</div>
                     <div><span className="text-slate-400">Проверено:</span> {c.scanned_at ? new Date(c.scanned_at).toLocaleString('ru-RU') : '—'}</div>
                     <div className="md:col-span-2 break-all"><span className="text-slate-400">SHA-256:</span> {c.thumbprint_sha256 || '—'}</div>
+                    <div className="md:col-span-2 break-all"><span className="text-slate-400">Issuer (полное имя):</span> {c.issuer || '—'}</div>
+                    <div><span className="text-slate-400">Изменение:</span> {c.change_pending ? 'Требует проверки' : c.change_count > 0 ? 'Проверено' : 'Базовая версия'}</div>
                     {c.last_change && <section className="md:col-span-2 mt-2 rounded-lg border border-orange-400/30 bg-orange-500/5 p-3 space-y-2">
                       <div className="flex flex-wrap justify-between gap-2 items-start">
                         <div><h3 className="font-semibold text-orange-200">Изменение сертификата №{c.change_count}</h3>
