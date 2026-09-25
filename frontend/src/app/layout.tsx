@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'CertSentry — Certificate Radar',
-  description: 'Инвентаризация TLS-сертификатов и мониторинг инфраструктурных рисков',
+  title: 'CertSentry — TLS Governance & Monitoring',
+  description: 'Мониторинг TLS-сертификатов, оценка инфраструктурных рисков и контроль изменений.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

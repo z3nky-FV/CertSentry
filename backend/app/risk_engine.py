@@ -98,8 +98,6 @@ def calculate_risk(
 
     # Criticality multiplier
     mult = w["criticality"].get(criticality.upper(), 1.0)
-    if mult != 1.0:
-        factors.append(RiskFactor("criticality", 0, f"Множитель ×{mult} для критичности {criticality}", "Учитывайте критичность сервиса при планировании устранения проблем."))
 
     score = min(100, max(0, int(raw * mult)))
 
